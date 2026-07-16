@@ -23,10 +23,10 @@
 // ---------------- OBJETOS FIREBASE ----------------
 void processData(AsyncResult &aResult);  //analisis resultado firebase
 UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS);
-FirebaseApp app;
+FirebaseApp app; //Creamos una app de Firebase (llamada app) que se refiere a nuestra app real
 WiFiClientSecure ssl_client;  //define la conexion wifi como ssl_client(conexion segura a firebase)
-using AsyncClient = AsyncClientClass;
-AsyncClient aClient(ssl_client);  //define la conexion asincronica(no traba loop) bajo el nombre aClient
+using AsyncClient = AsyncClientClass; 
+AsyncClient aClient(ssl_client);  //define la conexion asincronica(no traba loop) bajo el nombre aClient(usada para comunicacion con firebase)
 RealtimeDatabase Database;
 
 // ---------------- SENSOR Y OLED ----------------
@@ -48,11 +48,12 @@ float temperatura = 0;
 
 int estado = PANTALLA_1;
 int umbral = 23;
-int intervaloEnvio = 30;  // Tiempo en milisegundos (mínimo 30)
+int intervaloEnvio = 30000;  // Tiempo en segundos (mínimo 30)
 int ultimoEnvio = 0;
 int millisTemperatura = 0;
 
 String uid;  //guarda el user id
+//definimos las distintas rutas/"carpetas" de firebase
 String databasePath;
 String parentPath;
 String tempPath = "/temperatura";
@@ -79,10 +80,10 @@ void initWiFi() {  //inicializamos el wifi
 unsigned long getTime() {
   time_t now; //tiempo ahora, timestamp
   struct tm timeinfo; //variable para guardar estructura de tiempo
-  if (!getLocalTime(&timeinfo)) {
-    return (0);
+  if (!getLocalTime(&timeinfo)) { //guarda tiempo local en en esa variable sino puedee return 0
+    return (0); //si no encuentra tiempo
   }
-  time(&now);
+  time(&now); //comprobo que funciona guarda el tiempo aca
   return now;
 }
 
@@ -108,8 +109,8 @@ void setup() {
   u8g2.begin();
 
   initWiFi();
+  configTime(-10800, 0, ntpServer); //adaptado a gmt-3
 
-  // Configuración SSL (Igual a RNT)
   ssl_client.setInsecure();
 
   ssl_client.setHandshakeTimeout(5);  //si falla la conexion en mas de 5 segundos se cancela
@@ -214,14 +215,14 @@ void loop() {
 
   if (app.ready()) {  //si esta bien la conexion y autenticacion
     unsigned long tiempoActual = millis();
-    // intervaloEnvio está en segundos, lo pasamos a milisegundos
+    // intervaloEnvio está en segundos
     if (tiempoActual - ultimoEnvio >= (intervaloEnvio)) {
       ultimoEnvio = tiempoActual;
 
       uid = app.getUid().c_str();  //conseguimos la id del usuario
 
-      databasePath = "/UsersData/" + uid + "/readings";     //usamos esta uid para definir el camino a la base de datos
-      unsigned long timestamp = getTime();                  //guardamos el tiempo actual
+      databasePath = "/UsersData/" + uid + "/readings";     //usamos esta uid para definir el camino a la base de datos, mostrar firebase
+      unsigned long timestamp = getTime();                  //guardamos el tiempo actual 
       String tiempo = tiempoFormateado();
       parentPath = databasePath + "/" + String(timestamp);  //guarda lo mismo que database path pero tambien el timestamp
 
@@ -250,9 +251,9 @@ void processData(AsyncResult &aResult) {
   if (aResult.isDebug())  // Evalúa si la notificación trae información interna de depuración de bajo nivel (sockets, memoria, etc.)
     Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
 
-  if (aResult.isError())
+  if (aResult.isError())  // Informa si hubo un error
     Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(), aResult.error().code());
 
-  if (aResult.available())
+  if (aResult.available()) // Informa si Firebase devolvió información
     Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
 }
