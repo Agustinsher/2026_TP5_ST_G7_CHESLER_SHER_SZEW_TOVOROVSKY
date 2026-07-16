@@ -1,7 +1,6 @@
-/*
-  Integración de DHT11 + OLED (U8g2) + Firebase Realtime Database
-  Máquina de estados para control de pantallas y ciclo de guardado.
-*/
+
+//Chesler Sher Szew Tovorovsky - Grupo 7 - Curso 5C
+//NO BORRAR COMENTARIOS
 #define ENABLE_USER_AUTH
 #define ENABLE_DATABASE
 
@@ -17,10 +16,10 @@
 #define WIFI_SSID "MECA-IoT-V2"
 #define WIFI_PASSWORD "IoT$2026"
 
-#define Web_API_KEY "REPLACE_WITH_YOUR_FIREBASE_PROJECT_API_KEY"
-#define DATABASE_URL "REPLACE_WITH_YOUR_FIREBASE_DATABASE_URL"
-#define USER_EMAIL "REPLACE_WITH_FIREBASE_PROJECT_EMAIL_USER"
-#define USER_PASS "REPLACE_WITH_FIREBASE_PROJECT_USER_PASS"
+#define Web_API_KEY "AIzaSyBRdxilpXzY4n6WPU-3A7obdntHRv28_-U"
+#define DATABASE_URL "https://tp5-st-5c-g7-default-rtdb.firebaseio.com/"
+#define USER_EMAIL "ale2008szew@gmail.com"
+#define USER_PASS "tp5-st-5c-g7"
 
 // ---------------- OBJETOS FIREBASE ----------------
 void processData(AsyncResult &aResult);
@@ -49,21 +48,21 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 #define SALIR_PANTALLA_2 6
 
 int estado = PANTALLA_1;
-int estadoAnterior = PANTALLA_1;  // Para saber a dónde volver después de soltar
-
-
 
 int intervaloEnvio = 30;  // Tiempo en segundos (mínimo 30)
-
 unsigned long lastSendTime = 0;
+int millisTemperatura = 0;
 String uid; //guarda el user id
+String databasePath; // Ruta principal de la base de datos
+String parentPath;   // Nodo padre que se actualiza en el loop
+String tempPath = "/temperatura";
+String timePath = "/timestamp";
+
 const char *ntpServer = "pool.ntp.org";
 
 // Objetos JSON
-object_t jsonData, obj1, obj2, obj3; //objetos para la comunicacion con Firebase
+object_t jsonData, obj1, obj2; // Solo necesitamos 2 objetos  (Temp y Timestamp)
 JsonWriter writer;
-
-
 
 void initWiFi() { //inicializamos el wifi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -75,28 +74,15 @@ void initWiFi() { //inicializamos el wifi
   Serial.println("\nWiFi Conectado!");
 }
 
-// ---------------- FUNCIONES DE TIEMPO (NTP) ----------------
-String getFecha() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) return "Error";
-  char fecha[15];
-  strftime(fecha, sizeof(fecha), "%Y-%m-%d", &timeinfo);
-  return String(fecha);
-}
+// ---------------- FUNCION DE TIEMPO ----------------
 
-String getHora() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) return "Error";
-  char hora[15];
-  strftime(hora, sizeof(hora), "%H:%M:%S", &timeinfo);
-  return String(hora);
-}
-
-unsigned long getTimestamp() {
-  time_t now;
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) return 0;
-  time(&now);
+unsigned long getTime() { 
+  time_t now; //tiempo ahora
+  struct tm timeinfo; //crea tipo de dato para separar hora minutos fecha
+  if (!getLocalTime(&timeinfo)) { //pide la informacion si es false return 0
+    return(0);
+  }
+  time(&now); //si consigue esa conexion lo guarda y lo pasa a formato timestamp 
   return now;
 }
 
@@ -111,49 +97,53 @@ void setup() {
   u8g2.begin();
 
   initWiFi();
-  configTime(-10800, 0, ntpServer);  // Ajusta -10800 al offset de tu zona horaria (ej: -3 hs * 3600 = -10800)
+  configTime(-10800, 0, ntpServer);  // Ajusta -10800 al offset a zona horaria (-3 gmt * 3600 = -10800)
 
-  // Configuración SSL
+  // Configuración SSL (Igual a RNT)
   ssl_client.setInsecure();
   ssl_client.setConnectionTimeout(1000);
   ssl_client.setHandshakeTimeout(5);
 
-  // Inicializar Firebase
-  initializeApp(aClient, app, getAuth(user_auth), processData, "authTask");
-  app.getApp<RealtimeDatabase>(Database);
+  // Inicializar Firebase (Usando el emoji authTask como RNT)
+  initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask"); /*los reusltados de esta accion seran analizados 
+  en processData*/
+  app.getApp<RealtimeDatabase>(Database); // Vincula el objeto 'Database' con la configuración de la aplicación Firebase recién inicializada
   Database.url(DATABASE_URL);
 }
 
-// ---------------- LOOP PRINCIPAL ----------------
+// ---------------- LOOP ----------------
 void loop() {
   // Mantener autenticación de Firebase
   app.loop();
 
-  // Leer temperatura
-  float temperatura = dht.readTemperature();
-
+ // Lectura del sensor de temperatura cada 5 segundos
+  if (millis() - millisTemperatura >= 5000) {
+    float temperatura = dht.readTemperature();
+    millisUltimoCheck = millis();
+  }
+  
   // Verificar si es momento de enviar datos a Firebase
-  if (app.ready()) {
+  if (app.ready()) { //si esta bien la conexion y autenticacion 
     unsigned long currentTime = millis();
     // intervaloEnvio está en segundos, lo pasamos a milisegundos
     if (currentTime - lastSendTime >= (intervaloEnvio * 1000)) {
       lastSendTime = currentTime;
 
-      uid = app.getUid().c_str();
-      unsigned long ts = getTimestamp();
-      String fechaActual = getFecha();
-      String horaActual = getHora();
+      uid = app.getUid().c_str(); //conseguimos la id del usuario
 
-      String parentPath = "/UsersData/" + uid + "/readings/" + String(ts);
+      databasePath = "/UsersData/" + uid + "/readings"; //usamos esta uid para definir el camino a la base de datos
+      unsigned long timestamp = getTime();
+      parentPath = databasePath + "/" + String(timestamp); //guarda lo mismo que database path pero tambien el timestamp
 
-      // Crear JSON con Temperatura, Fecha y Hora
-      writer.create(obj1, "/temperatura", temperatura);
-      writer.create(obj2, "/fecha", fechaActual);
-      writer.create(obj3, "/hora", horaActual);
-      writer.join(jsonData, 3, obj1, obj2, obj3);
+      // Crear JSON con Temperatura y Timestamp
+      writer.create(obj1, tempPath, temperatura); //crea objetox con nombre x y variable x
+      writer.create(obj2, timePath, timestamp); 
+      writer.join(jsonData, 2, obj1, obj2); //une los 2 objetos en el nombre jsonData
 
-      Database.set<object_t>(aClient, parentPath, jsonData, processData, "RTDB_Send_Data");
-      Serial.println("Dato enviado a Firebase: " + String(temperatura) + "C a las " + horaActual);
+      Database.set<object_t>(aClient, parentPath, jsonData, processData, "RTDB_Send_Data"); /*sube los datos a firebase, se comunica con aClient 
+      a parentpath, manda jsonData, se analiza el resultado en funcion processData, el parametro ese entre comillas identifica la tarea*/
+      
+      Serial.println("Dato enviado a Firebase: " + String(temperatura) + "C con timestamp: " + String(timestamp));
     }
   }
 
@@ -169,9 +159,8 @@ void loop() {
       char mensajeTemp1[10];
       sprintf(mensajeTemp1, "%.1f C", temperatura);
       u8g2.drawStr(45, 20, mensajeTemp1);
-
-      // Mostrar VU: Ciclo de guardado actual
-      u8g2.drawStr(5, 50, "VU:");
+      // Mostrar  Ciclo de guardado actual
+      u8g2.drawStr(5, 50, "Ciclo:");
       char mensajeCiclo1[15];
       sprintf(mensajeCiclo1, "%d seg", intervaloEnvio);
       u8g2.drawStr(45, 50, mensajeCiclo1);
@@ -186,7 +175,7 @@ void loop() {
       if (digitalRead(sw1) == HIGH && digitalRead(sw2) == HIGH) {
         estado = PANTALLA_2;
       }
-
+      break;
     // --- PANTALLA 2: Modificar Ciclo de Guardado ---
     case PANTALLA_2:
       u8g2.clearBuffer();
@@ -209,21 +198,24 @@ void loop() {
       break;
 
 
-    // --- ACCIÓN: Aumentar ---
+    // ---  Aumentar ---
     case AUMENTAR_TIEMPO:
+      if (digitalRead(sw1) == HIGH){
       intervaloEnvio += 30;
       estado = PANTALLA_2;
+      }  
       break;
-    // --- ACCIÓN: Disminuir ---
+    // ---Disminuir ---
     case DISMINUIR_TIEMPO:
+      if (digitalRead(sw2) == HIGH){
       if (intervaloEnvio > 30) {
         intervaloEnvio -= 30;
       }
-      estado = PANTALLA_2;
+      estado = PANTALLA_2;  
+      }  
+      
       break;
 
-
-    // --- ESPERAR A QUE SE SUELTEN LOS BOTONES (Anti-Rebote) ---
     case SALIR_PANTALLA_2:
       if (digitalRead(sw1) == HIGH && digitalRead(sw2) == HIGH) {
         estado = PANTALLA_1;
@@ -232,10 +224,21 @@ void loop() {
   }
 }
 
-// ---------------- CALLBACK DE FIREBASE ----------------
-void processData(AsyncResult &aResult) {
-  if (!aResult.isResult()) return;
-  if (aResult.isError()) {
+// ---------------- ANALISIS RESULTADOS DE FIREBASE  ----------------
+void processData(AsyncResult &aResult){
+  if (!aResult.isResult()) 
+    return;
+
+  if (aResult.isEvent())
+    Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.eventLog().message().c_str(), aResult.eventLog().code());
+
+  if (aResult.isDebug())
+    Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
+
+  if (aResult.isError())
     Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(), aResult.error().code());
-  }
+
+  if (aResult.available())
+    Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
 }
+
