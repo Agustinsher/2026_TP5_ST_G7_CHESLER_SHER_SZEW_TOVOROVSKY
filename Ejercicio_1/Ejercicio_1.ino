@@ -80,8 +80,8 @@ void initWiFi() {  //inicializamos el wifi
 unsigned long getTime() {
   time_t now; //tiempo ahora, timestamp
   struct tm timeinfo; //variable para guardar estructura de tiempo
-  if (!getLocalTime(&timeinfo)) { //guarda tiempo local en en esa variable sino puede return 0
-    return "error"; //si no encuentra tiempo
+  if (!getLocalTime(&timeinfo)) { //guarda tiempo local en en esa variable sino puede return error
+    return (0); //si no encuentra tiempo
   }
   time(&now); //comprobo que funciona guarda el tiempo aca
   return now;
@@ -90,7 +90,7 @@ unsigned long getTime() {
 String tiempoFormateado() {
   struct tm timeinfo;
 
-  if (!getLocalTime(&timeinfo)) {
+  if (!getLocalTime(&timeinfo)) { 
     return "error";
   }
   char tiempo[25];
@@ -109,7 +109,7 @@ void setup() {
   u8g2.begin();
 
   initWiFi();
-  configTime(-10800, 0, ntpServer); //adaptado a gmt-3
+  configTime(-10800, 0, ntpServer); //adaptado a gmt-3, donde saca tiempo
 
   ssl_client.setInsecure();
 
@@ -168,7 +168,7 @@ void loop() {
       u8g2.setFont(u8g2_font_ncenB10_tr);
       u8g2.drawStr(5, 20, "Ciclo:");
       char mensajeCiclo[15];
-      sprintf(mensajeCiclo, "%d seg", intervaloEnvio/ 1000 );
+      sprintf(mensajeCiclo, "%d seg", intervaloEnvio/1000 ); //se imprime en segundos
       u8g2.drawStr(20, 50, mensajeCiclo);
       u8g2.sendBuffer();
       // Transiciones
