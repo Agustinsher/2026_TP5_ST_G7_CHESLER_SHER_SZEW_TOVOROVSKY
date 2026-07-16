@@ -35,7 +35,7 @@ RealtimeDatabase Database;
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
-
+float temperatura = 0;
 #define sw1 35
 #define sw2 34
 
@@ -118,8 +118,8 @@ void loop() {
 
  // Lectura del sensor de temperatura cada 5 segundos
   if (millis() - millisTemperatura >= 5000) {
-    float temperatura = dht.readTemperature();
-    millisUltimoCheck = millis();
+     temperatura = dht.readTemperature();
+    millisTemperatura = millis();
   }
   
   // Verificar si es momento de enviar datos a Firebase
