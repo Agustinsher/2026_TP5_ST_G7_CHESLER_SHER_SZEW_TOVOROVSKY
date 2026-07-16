@@ -22,12 +22,12 @@
 
 // ---------------- OBJETOS FIREBASE ----------------
 void processData(AsyncResult &aResult);  //analisis resultado firebase
-UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS);
+UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS); 
 FirebaseApp app; //Creamos una app de Firebase (llamada app) que se refiere a nuestra app real
 WiFiClientSecure ssl_client;  //define la conexion wifi como ssl_client(conexion segura a firebase)
 using AsyncClient = AsyncClientClass; 
 AsyncClient aClient(ssl_client);  //define la conexion asincronica(no traba loop) bajo el nombre aClient(usada para comunicacion con firebase)
-RealtimeDatabase Database;
+RealtimeDatabase Database; 
 
 // ---------------- SENSOR Y OLED ----------------
 #define DHTPIN 23
@@ -80,8 +80,8 @@ void initWiFi() {  //inicializamos el wifi
 unsigned long getTime() {
   time_t now; //tiempo ahora, timestamp
   struct tm timeinfo; //variable para guardar estructura de tiempo
-  if (!getLocalTime(&timeinfo)) { //guarda tiempo local en en esa variable sino puedee return 0
-    return (0); //si no encuentra tiempo
+  if (!getLocalTime(&timeinfo)) { //guarda tiempo local en en esa variable sino puede return 0
+    return "error"; //si no encuentra tiempo
   }
   time(&now); //comprobo que funciona guarda el tiempo aca
   return now;
@@ -116,17 +116,16 @@ void setup() {
   ssl_client.setHandshakeTimeout(5);  //si falla la conexion en mas de 5 segundos se cancela
 
   // Inicializar Firebase
-  initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask"); /*los reusltados de esta accion seran analizados 
+  initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask"); /* iniciamos app, los ressultados de esta accion seran analizados 
   en processData*/
-  app.getApp<RealtimeDatabase>(Database);                                     /**Vincula el objeto 'Database' con la configuración de la app 
-  Firebase recién inicializada */
+  app.getApp<RealtimeDatabase>(Database);//Se recibe la base de datos en tiempo real de Firebase
   Database.url(DATABASE_URL);
 }
 
 // ---------------- LOOP ----------------
 void loop() {
-  // Mantener autenticación de Firebase
-  app.loop();
+
+  app.loop(); // Mantiene a la app de Firebase en ejecución constante
 
   // Lectura del sensor de temperatura cada 5 segundos
   if (millis() - millisTemperatura >= 5000) {
@@ -145,7 +144,6 @@ void loop() {
       char mensajeTemp1[10];
       sprintf(mensajeTemp1, "%.1f C", temperatura);
       u8g2.drawStr(45, 20, mensajeTemp1);
-      // Mostrar  Ciclo de guardado actual
       u8g2.drawStr(5, 50, "VU:");
       char mensajeUmbral[15];
       sprintf(mensajeUmbral, "%d", umbral);
@@ -228,7 +226,7 @@ void loop() {
 
       // Crear JSON con Temperatura y Timestamp
       writer.create(obj1, tempPath, temperatura);  //crea objetox con direccion x y variable x
-      writer.create(obj2, timePath, tiempo);
+      writer.create(obj2, timePath, tiempo); 
       writer.join(jsonData, 2, obj1, obj2);  //une los 2 objetos en el nombre jsonData
 
       Database.set<object_t>(aClient, parentPath, jsonData, processData, "RTDB_Send_Data"); /*sube los datos a firebase, se comunica via aClient 
